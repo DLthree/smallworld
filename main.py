@@ -1,22 +1,29 @@
 import sys, os
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
+from sklearn.neighbors import LSHForest
 
 import scandir # pip install scandir
 
 def calc_similarity(filenames):
-    documents = [open(f).read() for f in filenames]
-    tfidf = TfidfVectorizer().fit_transform(documents)
-    # no need to normalize, since Vectorizer will return normalized tf-idf
-    pairwise_similarity = tfidf * tfidf.T
-    return pairwise_similarity
+    dt = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
+                           binary=True, ngram_range=(4,4))\
+        .fit_transform(filenames)
+    return 0
+    #tfidf = TfidfVectorizer(input="filename", encoding="latin-1", decode_error="replace", ).fit_transform(filenames)
+    #pairwise_similarity = tfidf * tfidf.T
+    #return pairwise_similarity
 
 def subfiles(path):
-    for entry in scandir.scandir(path):
-        if not entry.name.startswith('.') and not entry.is_dir():
-            yield entry.path
+    all_files = []
+    for root, dirs, files in os.walk(path):
+        files = [os.path.join(root, f) for f in files if not f.startswith('.')]
+        # don't visit hidden files
+        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        all_files.extend(files)
+    return all_files
 
 def subdirs(path):
-    return [ os.path.join(path, dirname) for dirname in os.listdir(path) ]
+    return [ entry.path for entry in scandir.scandir(path) if entry.is_dir() ]
 
 def get_file_tree(root_dir):
     return list(subfiles(root_dir))
@@ -43,13 +50,7 @@ if __name__ == "__main__":
         print package
 
     all_files = sum([package.files for package in packages], [])
-    print all_files
-
     print calc_similarity(all_files)
-
-
-
-
 
 
 
