@@ -1,27 +1,14 @@
-import sys, os
+import os
 from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
 from sklearn.neighbors import NearestNeighbors
 
 import string
-
 import cPickle as pickle
-from lsh import LSHCache
 import scandir # pip install scandir
 
-def iter_docs(filenames, tokenizer=string.split):
-    for name in filenames:
-        yield (tokenizer(open(name).read()), name)
-
-
-
-
-def calc_similarity(filenames, cache_file="similarity.npy"):
-    cache = LSHCache()
-    return cache.insert_batch(iter_docs(filenames))
-
-
-    if cache_file and os.path.exists(cache_file):
-        print "using cache %s" % cache_file
+def build_feature_matrix(filenames, cache_file=None, force=False):
+    if cache_file and os.path.exists(cache_file) and not force:
+        print "using feature matrix cache %s" % cache_file
         with open(cache_file) as f:
             dt = pickle.load(f)
     else:
@@ -33,14 +20,30 @@ def calc_similarity(filenames, cache_file="similarity.npy"):
             print "writing cache file %s" % cache_file
             with open(cache_file, "w") as f:
                 pickle.dump(dt, f, -1)
-    nn = NearestNeighbors()
-    print "fitting"
-    nn.fit(dt)
-    print "generating neighbor graph"
-    return nn.radius_neighbors_graph(radius=0.5, mode='distance')
-    # tfidf = TfidfVectorizer(input="filename", encoding="latin-1", decode_error="replace", ).fit_transform(filenames)
-    # pairwise_similarity = tfidf * tfidf.T
-    # return pairwise_similarity
+    return dt
+
+def build_distance_matrix(dt, threshold=0.8, cache_file=None, force=False):
+    if cache_file and os.path.exists(cache_file) and not force:
+        print "using distance matrix cache %s" % cache_file
+        with open(cache_file) as f:
+            mat = pickle.load(f)
+    else:
+        print "calculating distance matrix"
+        nn = NearestNeighbors()
+        print "  fitting"
+        nn.fit(dt)
+        print "  generating neighbor graph"
+        mat = nn.radius_neighbors_graph(radius=threshold, mode='distance')
+        if cache_file:
+            print "writing cache file %s" % cache_file
+            with open(cache_file, "w") as f:
+                pickle.dump(mat, f, -1)
+    return mat
+
+def calc_similarity(filenames, force=False):
+    dt = build_feature_matrix(filenames, force=force, cache_file="features.npy")
+    mat = build_distance_matrix(dt, threshold=0.8, force=force, cache_file="distance.npy")
+    return mat
 
 def subfiles(path):
     all_files = []
@@ -71,6 +74,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("src_dir")
+    parser.add_argument("--force", action="store_true", default=False)
+    parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
 
@@ -79,7 +84,10 @@ if __name__ == "__main__":
         print package
 
     all_files = sum([package.files for package in packages], [])
-    print calc_similarity(all_files)
+    if args.limit:
+        all_files = all_files[:limit]
+        print "using limit of %d documents" % limit
+    print calc_similarity(all_files, force=args.force)
 
 
 
