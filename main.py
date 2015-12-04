@@ -8,10 +8,12 @@ def calc_similarity(filenames):
     dt = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
                            binary=True, ngram_range=(4,4))\
         .fit_transform(filenames)
-    return 0
-    #tfidf = TfidfVectorizer(input="filename", encoding="latin-1", decode_error="replace", ).fit_transform(filenames)
-    #pairwise_similarity = tfidf * tfidf.T
-    #return pairwise_similarity
+    lshf = LSHForest()
+    lshf.fit(dt)
+    return lshf.radius_neighbors_graph(radius=0.5, mode='connectivity')
+    # tfidf = TfidfVectorizer(input="filename", encoding="latin-1", decode_error="replace", ).fit_transform(filenames)
+    # pairwise_similarity = tfidf * tfidf.T
+    # return pairwise_similarity
 
 def subfiles(path):
     all_files = []
