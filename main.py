@@ -1,16 +1,30 @@
 import sys, os
 from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
-from sklearn.neighbors import LSHForest
+from sklearn.neighbors import NearestNeighbors
+
+import cPickle as pickle
 
 import scandir # pip install scandir
 
-def calc_similarity(filenames):
-    dt = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
-                           binary=True, ngram_range=(4,4))\
-        .fit_transform(filenames)
-    lshf = LSHForest()
-    lshf.fit(dt)
-    return lshf.radius_neighbors_graph(radius=0.5, mode='connectivity')
+def calc_similarity(filenames, cache_file="similarity.npy"):
+    if cache_file and os.path.exists(cache_file):
+        print "using cache %s" % cache_file
+        with open(cache_file) as f:
+            dt = pickle.load(f)
+    else:
+        print "calculating feature vector"
+        dt = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
+                               binary=True, ngram_range=(4,4))\
+            .fit_transform(filenames)
+        if cache_file:
+            print "writing cache file %s" % cache_file
+            with open(cache_file, "w") as f:
+                pickle.dump(dt, f, -1)
+    nn = NearestNeighbors()
+    print "fitting"
+    nn.fit(dt)
+    print "generating neighbor graph"
+    return nn.radius_neighbors_graph(radius=0.5, mode='distance')
     # tfidf = TfidfVectorizer(input="filename", encoding="latin-1", decode_error="replace", ).fit_transform(filenames)
     # pairwise_similarity = tfidf * tfidf.T
     # return pairwise_similarity
