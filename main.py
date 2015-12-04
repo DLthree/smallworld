@@ -2,11 +2,24 @@ import sys, os
 from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
 from sklearn.neighbors import NearestNeighbors
 
-import cPickle as pickle
+import string
 
+import cPickle as pickle
+from lsh import LSHCache
 import scandir # pip install scandir
 
+def iter_docs(filenames, tokenizer=string.split):
+    for name in filenames:
+        yield (tokenizer(open(name).read()), name)
+
+
+
+
 def calc_similarity(filenames, cache_file="similarity.npy"):
+    cache = LSHCache()
+    return cache.insert_batch(iter_docs(filenames))
+
+
     if cache_file and os.path.exists(cache_file):
         print "using cache %s" % cache_file
         with open(cache_file) as f:
