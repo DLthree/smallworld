@@ -1,8 +1,6 @@
 import os
 from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
 from sklearn.neighbors import NearestNeighbors
-
-import string
 import cPickle as pickle
 import scandir # pip install scandir
 
@@ -22,7 +20,7 @@ def build_feature_matrix(filenames, cache_file=None, force=False):
                 pickle.dump(dt, f, -1)
     return dt
 
-def build_distance_matrix(dt, threshold=0.8, cache_file=None, force=False):
+def build_distance_matrix(dt, threshold=0.5, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
         print "using distance matrix cache %s" % cache_file
         with open(cache_file) as f:
@@ -41,8 +39,9 @@ def build_distance_matrix(dt, threshold=0.8, cache_file=None, force=False):
     return mat
 
 def calc_similarity(filenames, force=False):
-    dt = build_feature_matrix(filenames, force=force, cache_file="features.npy")
-    mat = build_distance_matrix(dt, threshold=0.8, force=force, cache_file="distance.npy")
+    sig = hash(tuple(filenames))
+    dt = build_feature_matrix(filenames, force=force, cache_file="features-%x.npy" % sig)
+    mat = build_distance_matrix(dt, threshold=0.5, force=force, cache_file="distance-%x.npy" % sig)
     return mat
 
 def subfiles(path):
@@ -85,8 +84,8 @@ if __name__ == "__main__":
 
     all_files = sum([package.files for package in packages], [])
     if args.limit:
-        all_files = all_files[:limit]
-        print "using limit of %d documents" % limit
+        all_files = all_files[:args.limit]
+        print "using limit of %d documents" % args.limit
     print calc_similarity(all_files, force=args.force)
 
 
