@@ -3,6 +3,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
 from sklearn.neighbors import NearestNeighbors
 import cPickle as pickle
 import scandir # pip install scandir
+from collections import defaultdict
 
 def build_feature_matrix(filenames, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
@@ -64,6 +65,7 @@ class SrcPackage(object):
         self.name = os.path.basename(root_dir)
         self.path = root_dir
         self.files = get_file_tree(root_dir)
+        self.similar_count = defaultdict(int)
 
     def __str__(self):
         return "%s (%d files)" % (self.name, len(self.files))
@@ -77,16 +79,31 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
-
     packages = [ SrcPackage(path) for path in subdirs(args.src_dir) ]
     for package in packages:
         print package
+
+    file_owners = {}
+    for package in packages:
+        for file in package.files:
+            file_owners[file] = package
 
     all_files = sum([package.files for package in packages], [])
     if args.limit:
         all_files = all_files[:args.limit]
         print "using limit of %d documents" % args.limit
-    print calc_similarity(all_files, force=args.force)
+    sim = calc_similarity(all_files, force=args.force)
+
+    coo = sim.tocoo()
+    for i,j,v in zip(coo.row, coo.col, coo.data):
+        pkg_a = file_owners[ all_files[i] ]
+        pkg_b = file_owners[ all_files[j] ]
+        pkg_a.similar_count[pkg_b] += 1
+
+    for pkg_a in packages:
+        print pkg_a.name
+        for pkg_b, count in pkg_a.similar_count.iteritems():
+            print "  %-20s : %d" % (pkg_b.name, count)
 
 
 
