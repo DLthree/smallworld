@@ -1,10 +1,24 @@
 import os
-from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
-from sklearn.neighbors import NearestNeighbors
+from sklearn.feature_extraction.text import HashingVectorizer
 import cPickle as pickle
 import scandir # pip install scandir
 from collections import defaultdict
 import scipy
+import scipy.spatial
+
+def file_connectivity(x, y, threshold, samples):
+    # todo normalize this to 0..1
+    # todo return 1 - x because 0.0 entries are ignored in sparse matrix
+    d = scipy.spatial.distance.euclidean(x, y)
+    print d
+    if d < threshold:
+        return d
+
+    # if scipy.sp
+    # sqthreshold = threshold**2
+    # sqdistance = scipy.spatial.distance.sqeuclidean(x[:samples],y[:samples])
+    # if sqdistance < sqthreshold:
+
 
 def build_feature_matrix(filenames, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
@@ -22,32 +36,34 @@ def build_feature_matrix(filenames, cache_file=None, force=False):
                 pickle.dump(dt, f, -1)
     return dt
 
-def build_distance_matrix(dt, threshold=0.5, cache_file=None, force=False):
+def build_distance_matrix(dt, threshold, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
         print "using distance matrix cache %s" % cache_file
         with open(cache_file) as f:
             mat = pickle.load(f)
     else:
-        print "calculating distance matrix"
-
-        # nn = NearestNeighbors()
-        # print "  fitting"
-        # nn.fit(dt)
-        # print "  generating neighbor graph"
-        # mat = nn.radius_neighbors_graph(radius=threshold, mode='distance')
-        mat = scipy.spatial.distance.pdist(dt)
-
-
+        print "calculating connectivity matrix"
+        n = dt.shape[0]
+        mat = scipy.sparse.lil_matrix( (n, n) )
+        for i,x in enumerate(dt):
+            xd = x.todense()
+            for j,y in enumerate(dt):
+                yd = y.todense()
+                print i,j,
+                d = file_connectivity(xd,yd,threshold=threshold, samples=1)
+                if d is not None:
+                    print "!"
+                    mat[i,j] = d
         if cache_file:
             print "writing cache file %s" % cache_file
             with open(cache_file, "w") as f:
                 pickle.dump(mat, f, -1)
     return mat
 
-def calc_similarity(filenames, force=False):
+def calc_similarity(filenames, threshold, force=False):
     sig = hash(tuple(filenames))
     dt = build_feature_matrix(filenames, force=force, cache_file="features-%x.npy" % sig)
-    mat = build_distance_matrix(dt, threshold=0.5, force=force, cache_file="distance-%x.npy" % sig)
+    mat = build_distance_matrix(dt, threshold, force=force, cache_file="distance-%x.npy" % sig)
     return mat
 
 def subfiles(path):
@@ -82,6 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("src_dir")
     parser.add_argument("--force", action="store_true", default=False)
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--threshold", type=float, default=0.5)
     args = parser.parse_args()
 
     packages = [ SrcPackage(path) for path in subdirs(args.src_dir) ]
@@ -97,13 +114,16 @@ if __name__ == "__main__":
     if args.limit:
         all_files = all_files[:args.limit]
         print "using limit of %d documents" % args.limit
-    sim = calc_similarity(all_files, force=args.force)
+    sim = calc_similarity(all_files, threshold=args.threshold, force=args.force)
+
+    # TODO pkg_connectivity(a,b) = (num similar files over thresold) / min(num a files, num b files)
 
     coo = sim.tocoo()
     for i,j,v in zip(coo.row, coo.col, coo.data):
         pkg_a = file_owners[ all_files[i] ]
         pkg_b = file_owners[ all_files[j] ]
         pkg_a.similar_count[pkg_b] += 1
+        print i, j, v
 
     for pkg_a in packages:
         print pkg_a.name
