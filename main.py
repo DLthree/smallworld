@@ -4,6 +4,7 @@ from sklearn.neighbors import NearestNeighbors
 import cPickle as pickle
 import scandir # pip install scandir
 from collections import defaultdict
+import scipy
 
 def build_feature_matrix(filenames, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
@@ -28,11 +29,15 @@ def build_distance_matrix(dt, threshold=0.5, cache_file=None, force=False):
             mat = pickle.load(f)
     else:
         print "calculating distance matrix"
-        nn = NearestNeighbors()
-        print "  fitting"
-        nn.fit(dt)
-        print "  generating neighbor graph"
-        mat = nn.radius_neighbors_graph(radius=threshold, mode='distance')
+
+        # nn = NearestNeighbors()
+        # print "  fitting"
+        # nn.fit(dt)
+        # print "  generating neighbor graph"
+        # mat = nn.radius_neighbors_graph(radius=threshold, mode='distance')
+        mat = scipy.spatial.distance.pdist(dt)
+
+
         if cache_file:
             print "writing cache file %s" % cache_file
             with open(cache_file, "w") as f:
