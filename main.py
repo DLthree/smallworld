@@ -6,13 +6,10 @@ from collections import defaultdict
 import scipy
 import scipy.spatial
 
-def file_connectivity(x, y, threshold, samples):
-    # todo normalize this to 0..1
-    # todo return 1 - x because 0.0 entries are ignored in sparse matrix
-    d = scipy.spatial.distance.euclidean(x, y)
-    print d
+def file_connectivity(x, y, threshold):
+    d = scipy.spatial.distance.cosine(x, y)
     if d < threshold:
-        return d
+        return 1-d
 
     # if scipy.sp
     # sqthreshold = threshold**2
@@ -49,10 +46,8 @@ def build_distance_matrix(dt, threshold, cache_file=None, force=False):
             xd = x.todense()
             for j,y in enumerate(dt):
                 yd = y.todense()
-                print i,j,
-                d = file_connectivity(xd,yd,threshold=threshold, samples=1)
+                d = file_connectivity(xd,yd,threshold=threshold)
                 if d is not None:
-                    print "!"
                     mat[i,j] = d
         if cache_file:
             print "writing cache file %s" % cache_file
