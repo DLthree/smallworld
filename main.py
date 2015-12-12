@@ -6,17 +6,6 @@ from collections import defaultdict
 import scipy
 import scipy.spatial
 
-def file_connectivity(x, y, threshold):
-    d = scipy.spatial.distance.cosine(x, y)
-    if d < threshold:
-        return 1-d
-
-    # if scipy.sp
-    # sqthreshold = threshold**2
-    # sqdistance = scipy.spatial.distance.sqeuclidean(x[:samples],y[:samples])
-    # if sqdistance < sqthreshold:
-
-
 def build_feature_matrix(filenames, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
         print "using feature matrix cache %s" % cache_file
@@ -40,15 +29,8 @@ def build_distance_matrix(dt, threshold, cache_file=None, force=False):
             mat = pickle.load(f)
     else:
         print "calculating connectivity matrix"
-        n = dt.shape[0]
-        mat = scipy.sparse.lil_matrix( (n, n) )
-        for i,x in enumerate(dt):
-            xd = x.todense()
-            for j,y in enumerate(dt):
-                yd = y.todense()
-                d = file_connectivity(xd,yd,threshold=threshold)
-                if d is not None:
-                    mat[i,j] = d
+        mat = scipy.spatial.distance.pdist(dt.todense())
+        # TODO if i,j < threshold, add to sparse matrix
         if cache_file:
             print "writing cache file %s" % cache_file
             with open(cache_file, "w") as f:
