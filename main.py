@@ -1,10 +1,10 @@
 import os
 from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.metrics.pairwise import pairwise_distances
 import cPickle as pickle
 import scandir # pip install scandir
 from collections import defaultdict
-import scipy
-import scipy.spatial
+import numpy as np
 
 def build_feature_matrix(filenames, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
@@ -29,7 +29,8 @@ def build_distance_matrix(dt, threshold, cache_file=None, force=False):
             mat = pickle.load(f)
     else:
         print "calculating connectivity matrix"
-        mat = scipy.spatial.distance.pdist(dt.todense())
+        # mat = scipy.spatial.distance.pdist(dt.todense())
+        mat = pairwise_distances(dt, metric='cosine', n_jobs=-1)
         # TODO if i,j < threshold, add to sparse matrix
         if cache_file:
             print "writing cache file %s" % cache_file
@@ -57,6 +58,19 @@ def subdirs(path):
 
 def get_file_tree(root_dir):
     return list(subfiles(root_dir))
+
+def iterarray(arr):
+
+    it = np.nditer(arr, flags=['multi_index'])
+    while not it.finished:
+        i,j = it.multi_index
+        v = it[0]
+        yield i,j,v
+        it.iternext()
+    # coo = sim.tocoo()
+    # for i,j,v in zip(coo.row, coo.col, coo.data):
+    #     yield i,j,v
+
 
 class SrcPackage(object):
     def __init__(self, root_dir):
@@ -95,12 +109,14 @@ if __name__ == "__main__":
 
     # TODO pkg_connectivity(a,b) = (num similar files over thresold) / min(num a files, num b files)
 
-    coo = sim.tocoo()
-    for i,j,v in zip(coo.row, coo.col, coo.data):
+    for i,j,v in iterarray(sim):
+        if abs(v) > args.threshold: continue
+        if i == j: continue
+
+        # print i, j, v
         pkg_a = file_owners[ all_files[i] ]
         pkg_b = file_owners[ all_files[j] ]
         pkg_a.similar_count[pkg_b] += 1
-        print i, j, v
 
     for pkg_a in packages:
         print pkg_a.name
