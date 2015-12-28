@@ -9,6 +9,7 @@ from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.sparse import coo_matrix
 
+
 class Source(object):
     def __init__(self, path):
         self.name = os.path.basename(path)
@@ -23,7 +24,7 @@ class Source(object):
     def build_features(self):
         logging.debug("calculating features for %s" % self.name)
         x = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
-                              binary=False, ngram_range=(4,4))\
+                              binary=False, ngram_range=(4, 4))\
             .fit_transform(self.files)
         logging.debug(repr(x))
         self.features = x
@@ -52,11 +53,12 @@ class Source(object):
         z = self.build_distance_matrix(other)
         return coo_matrix(z < threshold)
 
+
 class Smallworld(object):
     def __init__(self, path, cache_path=None):
         self.path = os.path.abspath(path)
         self.dirs = list_dirs(path)
-        self.sources = [ Source(p) for p in self.dirs ]
+        self.sources = [Source(p) for p in self.dirs]
 
         if cache_path is not None:
             self.cache_path = cache_path
@@ -89,13 +91,11 @@ class Smallworld(object):
                 src.save_features(path)
 
         # load similarity results
-        pass # TODO
+        pass  # TODO
 
     def save(self):
         # save similarity results
         pass
-
-
 
 
 if __name__ == "__main__":
