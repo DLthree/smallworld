@@ -10,39 +10,35 @@ def build_feature_matrix(filenames, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
         print "using feature matrix cache %s" % cache_file
         with open(cache_file) as f:
-            dt = pickle.load(f)
+            x = pickle.load(f)
     else:
         print "calculating feature vector"
-        dt = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
-                               binary=True, ngram_range=(4,4))\
+        x = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
+                               binary=False, ngram_range=(4,4))\
             .fit_transform(filenames)
         if cache_file:
             print "writing cache file %s" % cache_file
             with open(cache_file, "w") as f:
-                pickle.dump(dt, f, -1)
-    return dt
+                pickle.dump(x, f, -1)
+    return x
 
-def build_distance_matrix(dt, threshold, cache_file=None, force=False):
+def build_distance_matrix(x, y, cache_file=None, force=False):
     if cache_file and os.path.exists(cache_file) and not force:
         print "using distance matrix cache %s" % cache_file
         with open(cache_file) as f:
-            mat = pickle.load(f)
+            z = pickle.load(f)
     else:
         print "calculating connectivity matrix"
-        # mat = scipy.spatial.distance.pdist(dt.todense())
-        mat = pairwise_distances(dt, metric='cosine', n_jobs=-1)
-        # TODO if i,j < threshold, add to sparse matrix
+        z = pairwise_distances(x,y, metric='cosine', n_jobs=-1)
         if cache_file:
             print "writing cache file %s" % cache_file
             with open(cache_file, "w") as f:
-                pickle.dump(mat, f, -1)
-    return mat
+                pickle.dump(z, f, -1)
+    return z
 
-def calc_similarity(filenames, threshold, force=False):
-    sig = hash(tuple(filenames))
-    dt = build_feature_matrix(filenames, force=force, cache_file="features-%x.npy" % sig)
-    mat = build_distance_matrix(dt, threshold, force=force, cache_file="distance-%x.npy" % sig)
-    return mat
+def calc_similarity(x, y, threshold, force=False):
+    z = build_distance_matrix(x, y, force=force)
+    return z
 
 def subfiles(path):
     all_files = []
@@ -56,31 +52,26 @@ def subfiles(path):
 def subdirs(path):
     return [ entry.path for entry in scandir.scandir(path) if entry.is_dir() ]
 
-def get_file_tree(root_dir):
-    return list(subfiles(root_dir))
-
 def iterarray(arr):
-
     it = np.nditer(arr, flags=['multi_index'])
     while not it.finished:
         i,j = it.multi_index
         v = it[0]
         yield i,j,v
         it.iternext()
-    # coo = sim.tocoo()
-    # for i,j,v in zip(coo.row, coo.col, coo.data):
-    #     yield i,j,v
-
 
 class SrcPackage(object):
     def __init__(self, root_dir):
         self.name = os.path.basename(root_dir)
         self.path = root_dir
-        self.files = get_file_tree(root_dir)
+        self.files = list(subfiles(root_dir))
         self.similar_count = defaultdict(int)
 
     def __str__(self):
         return "%s (%d files)" % (self.name, len(self.files))
+
+    def build_feature_matrix(self, force=False):
+        self.features = build_feature_matrix(self.files, force=force)
 
 if __name__ == "__main__":
     import argparse
@@ -89,23 +80,26 @@ if __name__ == "__main__":
     parser.add_argument("src_dir")
     parser.add_argument("--force", action="store_true", default=False)
     parser.add_argument("--limit", type=int, default=0)
-    parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument("--threshold", type=float, default=0.8)
     args = parser.parse_args()
 
     packages = [ SrcPackage(path) for path in subdirs(args.src_dir) ]
-    for package in packages:
-        print package
+    for pkg in packages:
+        print pkg
+        pkg.build_feature_matrix(force=args.force)
 
-    file_owners = {}
-    for package in packages:
-        for file in package.files:
-            file_owners[file] = package
+    # file_owners = {}
+    # for package in packages:
+    #     for file in package.files:
+    #         file_owners[file] = package
+    #
 
-    all_files = sum([package.files for package in packages], [])
-    if args.limit:
-        all_files = all_files[:args.limit]
-        print "using limit of %d documents" % args.limit
-    sim = calc_similarity(all_files, threshold=args.threshold, force=args.force)
+    for a in packages:
+        for b in packages:
+            if a == b: continue
+            similar = calc_similarity(a.features, b.features, threshold=0.2)
+            import pdb; pdb.set_trace()
+
 
     # TODO pkg_connectivity(a,b) = (num similar files over thresold) / min(num a files, num b files)
 
@@ -113,7 +107,8 @@ if __name__ == "__main__":
         if abs(v) > args.threshold: continue
         if i == j: continue
 
-        # print i, j, v
+        print all_files[i], all_files[j]
+        print i, j, v
         pkg_a = file_owners[ all_files[i] ]
         pkg_b = file_owners[ all_files[j] ]
         pkg_a.similar_count[pkg_b] += 1
