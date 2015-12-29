@@ -2,6 +2,7 @@ import os
 import errno
 import logging
 import cPickle as pickle
+import itertools
 
 from util import list_dirs, list_files_recursive
 
@@ -105,6 +106,7 @@ class Smallworld(object):
 
     def get_similarity(self):
         self.similarity_matrices = {}
+        # TODO fix normalized / threshold problem
         # load or calculate similarity results
         for i,a in enumerate(self.sources):
             for b in self.sources[i + 1:]:
@@ -119,10 +121,13 @@ class Smallworld(object):
                     logging.debug("saving similarity matrix to %s" % path)
                     with open(path, 'w') as f:
                         pickle.dump(m, f, -1)
-                self.similarity_matrices[key] = m
+                self.similarity_matrices[(a,b)] = m
 
-    def save(self):
-        pass
+    def print_matches(self):
+        for (a,b),m in self.similarity_matrices.iteritems():
+            print a.name, b.name
+            for i, j, v in itertools.izip(m.row, m.col, m.data):
+                print "  ", a.files[i], b.files[j]
 
 
 if __name__ == "__main__":
@@ -142,4 +147,4 @@ if __name__ == "__main__":
 
     s = Smallworld(args.path)
     s.resume()
-    s.save()
+    s.print_matches()
