@@ -24,6 +24,8 @@ class Source(object):
 
     def build_features(self):
         logging.debug("calculating features for %s" % self.name)
+        # use similarity_test.py to figure out the most appropriate feature vector
+
         x = HashingVectorizer(input="filename", encoding="latin-1", decode_error="replace",
                               binary=False, ngram_range=(4, 4))\
             .fit_transform(self.files)
@@ -106,7 +108,6 @@ class Smallworld(object):
 
     def get_similarity(self):
         self.similarity_matrices = {}
-        # TODO fix normalized / threshold problem
         # load or calculate similarity results
         for i,a in enumerate(self.sources):
             for b in self.sources[i + 1:]:
