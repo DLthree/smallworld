@@ -55,10 +55,13 @@ class Source(object):
 
 
 class Smallworld(object):
+    THRESHOLD = 0.5
+
     def __init__(self, path, cache_path=None):
         self.path = os.path.abspath(path)
         self.dirs = list_dirs(path)
         self.sources = [Source(p) for p in self.dirs]
+        self.similarity_matrices = None
 
         if cache_path is not None:
             self.cache_path = cache_path
@@ -80,7 +83,17 @@ class Smallworld(object):
     def __str__(self):
         return "Smallworld(%s, %d sources)" % (self.path, len(self.sources))
 
+    @staticmethod
+    def make_key(a,b):
+        r,s = sorted((a.name,b.name))
+        key = "%s,%s" % (r, s)
+        return key
+
     def resume(self):
+        self.get_features()
+        self.get_similarity()
+
+    def get_features(self):
         # load or calculate features for each source
         for src in self.sources:
             path = os.path.join(self.cache_path, "%s.features" % src.name)
@@ -90,11 +103,25 @@ class Smallworld(object):
                 src.build_features()
                 src.save_features(path)
 
-        # load similarity results
-        pass  # TODO
+    def get_similarity(self):
+        self.similarity_matrices = {}
+        # load or calculate similarity results
+        for i,a in enumerate(self.sources):
+            for b in self.sources[i + 1:]:
+                key = self.make_key(a,b)
+                path = os.path.join(self.cache_path, "%s.similarity" % key)
+                if os.path.exists(path):
+                    logging.debug("loading similarity matrix from %s" % path)
+                    with open(path) as f:
+                        m = pickle.load(f)
+                else:
+                    m = a.build_similarity_matrix(b, threshold=self.THRESHOLD)
+                    logging.debug("saving similarity matrix to %s" % path)
+                    with open(path, 'w') as f:
+                        pickle.dump(m, f, -1)
+                self.similarity_matrices[key] = m
 
     def save(self):
-        # save similarity results
         pass
 
 
@@ -115,10 +142,4 @@ if __name__ == "__main__":
 
     s = Smallworld(args.path)
     s.resume()
-    for a in s.sources:
-        for b in s.sources:
-            if a == b: continue
-            a.build_distance_matrix(b)
-            # d[a.name, b.name] = a.build_similarity_matrix(b, threshold)
-
     s.save()
